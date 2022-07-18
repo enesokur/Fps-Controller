@@ -19,6 +19,12 @@ public class Player : MonoBehaviour
     [SerializeField]
     private AudioClip _shotSound;
     private AudioSource _audioSource;
+    [SerializeField]
+    private int _maxAmmo;
+    [SerializeField]
+    private int _currentAmmo;
+    private bool _isReloading;
+    private UIHandler _uiHandler;
 
 
     private void Start() {
@@ -26,14 +32,20 @@ public class Player : MonoBehaviour
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
         _audioSource = this.GetComponent<AudioSource>();
+        _currentAmmo = _maxAmmo;
+        _uiHandler = GameObject.Find("Canvas").GetComponent<UIHandler>();
     }
 
     private void Update() {
         CalculateMovement();
-        CastARay();
+        Shoot();
         if(Input.GetKeyDown(KeyCode.Escape)){
             Cursor.visible = true;
             Cursor.lockState = CursorLockMode.None;
+        }
+        if(Input.GetKeyDown(KeyCode.R) && _isReloading == false){
+            StartCoroutine(ReloadRoutine());
+            _isReloading = true;
         }
     }
 
@@ -54,12 +66,14 @@ public class Player : MonoBehaviour
         _controller.Move(velocity*Time.deltaTime);
     }
 
-    private void CastARay(){
+    private void Shoot(){
         if(Time.time > _shootCoolDown){
-            if(Input.GetMouseButton(0)){
+            if(Input.GetMouseButton(0) && _currentAmmo > 0 && _isReloading == false){
                 _particle.Play();
                 _audioSource.Play();
                 _shootCoolDown = Time.time + _shootRate;
+                _currentAmmo--;
+                _uiHandler.UpdateAmmo(_currentAmmo);
                 //Ray ray = Camera.main.ScreenPointToRay(new Vector3(Screen.width/2f,Screen.height/2f,0f));
                 Ray ray = Camera.main.ViewportPointToRay(new Vector3(0.5f,0.5f,0f));
                 RaycastHit hitInfo;
@@ -67,9 +81,21 @@ public class Player : MonoBehaviour
                     GameObject hitEffectObject = Instantiate(_hiteffect,hitInfo.point,Quaternion.LookRotation(hitInfo.normal));
                     hitEffectObject.transform.localScale = new Vector3(1.5f,1.5f,1.5f);
                     hitEffectObject.GetComponent<ParticleSystem>().Play();
-                    //Destroy(hitEffectObject.gameObject,1f);
+                    Debug.Log(hitInfo.transform.name);
+                    Destroy(hitEffectObject.gameObject,1f);
+                    Destructible crateScript = hitInfo.transform.GetComponent<Destructible>();
+                    if(crateScript != null){
+                        crateScript.DestructCrate();
+                    }
                 }
             }
         }
+    }
+
+    IEnumerator ReloadRoutine(){
+        yield return new WaitForSeconds(1.5f);
+        _currentAmmo = _maxAmmo;
+        _uiHandler.UpdateAmmo(_currentAmmo);
+        _isReloading = false;
     }
 }
